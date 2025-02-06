@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# This will download hp-health from HPE's repo, patch the .deb to allow its installation,
+# then install HPE Agentless Management Software along with HPONCFG online configuration tool.
+# HP/HPE software are distributed under proprietary licenses, see their website for the EULA
+
+# Download hp-health and remove 32bits dependencies, then install it
+wget https://downloads.linux.hpe.com/SDR/repo/mcp/Debian/pool/non-free/hp-health_10.80-1874.10_amd64.deb -O /tmp/hp-health.deb
+mkdir /tmp/hp-health && ar x /tmp/hp-health.deb --output=/tmp/hp-health
+tar xzf /tmp/hp-health/control.tar.gz -C /tmp/hp-health
+sed "s|, libc6-i686.*||" -i /tmp/hp-health/control
+cd /tmp/hp-health && tar c postinst postrm prerm shlibs triggers conffiles md5sums control | gzip -c > control.tar.gz
+ar rcs /tmp/hp-health-patched.deb debian-binary control.tar.gz data.tar.xz
+yes | dpkg -i /tmp/hp-health-patched.deb
+cd /tmp && rm -R hp-health*
+
+# Add HPE Management Component Pack repository
+cat <<EOF > /etc/apt/sources.list.d/hpe-mcp.list
+# HPE Management Component Pack
+deb [signed-by=/etc/apt/keyrings/hpPublicKey2048_key1.gpg,/etc/apt/keyrings/hpePublicKey2048_key1.gpg,/etc/apt/keyrings/hpePublicKey2048_key2.gpg]  http://downloads.linux.hpe.com/SDR/repo/mcp jessie/current non-free
+EOF
+
+# Install the remaining packages
+DEBIAN_FRONTEND=noninteractive apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install hponcfg hp-ams --yes
